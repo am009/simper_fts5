@@ -8,18 +8,10 @@ SQLITE_EXTENSION_INIT3
 #include <stddef.h>
 
 
-typedef unsigned char  u8;
-typedef unsigned int   u32;
-typedef unsigned short u16;
-typedef short i16;
-typedef sqlite3_int64 i64;
-typedef sqlite3_uint64 u64;
-#ifndef UNUSED_PARAM
-# define UNUSED_PARAM(X)  (void)(X)
-#endif
-
+#include "simper_int.h"
 
 #include "fts5_unicode2.h"
+#include "uni.h"
 
 /**************************************************************************
 ** Start of unicode61 tokenizer implementation.
@@ -31,7 +23,7 @@ typedef sqlite3_uint64 u64;
 ** from the sqlite3 source file utf.c. If this file is compiled as part
 ** of the amalgamation, they are not required.
 */
-#ifndef SQLITE_AMALGAMATION
+// #ifndef SQLITE_AMALGAMATION
 
 static const unsigned char sqlite3Utf8Trans1[] = {
   0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
@@ -77,7 +69,7 @@ static const unsigned char sqlite3Utf8Trans1[] = {
   }                                                    \
 }
 
-#endif /* ifndef SQLITE_AMALGAMATION */
+// #endif /* ifndef SQLITE_AMALGAMATION */
 
 typedef struct Unicode61Tokenizer Unicode61Tokenizer;
 struct Unicode61Tokenizer {
@@ -361,7 +353,13 @@ int fts5UnicodeTokenize(
         if( fts5UnicodeIsAlnum(p,iCode)||sqlite3Fts5UnicodeIsdiacritic(iCode) ){
  non_ascii_tokenchar:
           iCode = sqlite3Fts5UnicodeFold(iCode, p->eRemoveDiacritic);
-          if( iCode ) WRITE_UTF8(zOut, iCode);
+          if( iCode ){
+            WRITE_UTF8(zOut, iCode);
+            if (simperSingleTokenCode(iCode)){
+              ie = zCsr - (unsigned char*)pText;
+              break;
+            }
+          }
         }else{
           break;
         }
@@ -387,4 +385,28 @@ int fts5UnicodeTokenize(
  tokenize_done:
   if( rc==SQLITE_DONE ) rc = SQLITE_OK;
   return rc;
+}
+
+// https://jrgraphix.net/research/unicode_blocks.php
+// https://en.wikipedia.org/wiki/CJK_Unified_Ideographs
+// 3400 — 4DBF  	CJK Unified Ideographs Extension A
+// 4E00 — 9FFF  	CJK Unified Ideographs
+// F900 — FAFF  	CJK Compatibility Ideographs
+// 20000 — 2A6DF 2A700-2B73F 2B740–2B81F. 2B820–2CEAF. 2CEB0–2EBEF.	CJK Unified Ideographs Extension B/C/D/E/F
+// 2F800 — 2FA1F  	CJK Compatibility Ideographs Supplement
+//   30000–3134F. CJK Unified Ideographs Extension G
+int simperSingleTokenCode(u32 iCode) {
+  static const u32 arr[6][2] = {
+    {0x3400, 0x4DBF}, {0x4E00, 0x9FFF}, {0xF900, 0xFAFF}, {0x20000, 0x2EBEF}, {0x2F800, 0x2FA1F}, {0x30000, 0x3134F}
+  };
+  for(int i=0;i<6;i++) {
+    if (iCode < arr[i][0]) { // smaller
+      break;
+    }
+    if (iCode <= arr[i][1]) { // in range
+      return 1;
+    }
+    // bigger than range
+  }
+  return 0;
 }

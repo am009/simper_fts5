@@ -14,4 +14,5 @@ int fts5UnicodeCreate(
 
 void fts5UnicodeDelete(Fts5Tokenizer *pTok);
 
+int simperSingleTokenCode(u32 iCode);
 

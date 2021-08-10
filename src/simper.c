@@ -2,6 +2,8 @@
 #include "sqlite3ext.h" /* Do not use <sqlite3.h>! */
 SQLITE_EXTENSION_INIT1
 
+#include "simper_int.h"
+
 #include "uni.h"
 
 /* Insert your extension code here */
